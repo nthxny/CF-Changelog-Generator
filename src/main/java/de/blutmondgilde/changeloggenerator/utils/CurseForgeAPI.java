@@ -16,6 +16,7 @@ import de.blutmondgilde.changeloggenerator.model.Minecraft;
 import de.blutmondgilde.changeloggenerator.model.ModFile;
 import io.github.furstenheim.CopyDown;
 import org.apache.http.HttpEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
@@ -29,6 +30,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class CurseForgeAPI {
@@ -89,8 +91,20 @@ public class CurseForgeAPI {
         try {
             return executionService.schedule(() -> {
                 try (CloseableHttpClient client = HttpClients.createDefault()) {
-                    HttpGet request = authorizedGet(String.format("/v1/minecraft/modloader/%s", minecraft.getModLoaders()[0].getId()));
-                    HttpEntity entity = client.execute(request).getEntity();
+                    var modloader = minecraft.getModLoaders()[0].getId();
+
+                    if (modloader.startsWith("fabric")) {
+                        var pattern = Pattern.compile("(fabric-\\d+\\.\\d+\\.\\d+)(?=-\\d+\\.\\d+\\.\\d+)");
+                        var matcher = pattern.matcher(modloader);
+
+                        if (!matcher.find()) {
+                            modloader = modloader + "-" + minecraft.getVersion();
+                        }
+                    }
+
+                    HttpGet request = authorizedGet(String.format("/v1/minecraft/modloader/%s", modloader));
+                    CloseableHttpResponse executed = client.execute(request);
+                    HttpEntity entity = executed.getEntity();
                     String responseString = EntityUtils.toString(entity, StandardCharsets.UTF_8);
                     CFModLoaderResponse response = mapper.readValue(responseString, CFModLoaderResponse.class);
                     return response.getData();

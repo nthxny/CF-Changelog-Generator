@@ -3,6 +3,7 @@ package de.blutmondgilde.changeloggenerator.model;
 import de.blutmondgilde.changeloggenerator.Main;
 import de.blutmondgilde.changeloggenerator.utils.CurseForgeAPI;
 import de.blutmondgilde.changeloggenerator.utils.Pair;
+import org.apache.commons.codec.binary.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -88,7 +89,15 @@ public class ModpackChanges {
                             .append(project.getSlug())
                             .append(")\n\n");
                         builder.append("### ").append(mod.getDisplayName()).append("\n");
-                        builder.append(this.api.getModChangeLog(file.getRight())).append("\n");
+
+                        var newChangelog = this.api.getModChangeLog(file.getRight());
+                        var oldChangelog = this.api.getModChangeLog(file.getLeft());
+
+                        if (newChangelog.contains(oldChangelog)) {
+                            newChangelog = newChangelog.replace(oldChangelog, "");
+                        }
+
+                        builder.append(newChangelog).append("\n");
                         System.out.printf("Checking for skipped files for %s%n", project.getName());
                         List<CFModFile> skippedUpdates = api.getFilesBetween(this.modLoader, file.getLeft(), file.getRight());
                         if (skippedUpdates.size() > 0) {
@@ -156,6 +165,37 @@ public class ModpackChanges {
         return builder.toString();
     }
 
+    public static String difference(String str1, String str2) {
+        if (str1 == null) {
+            return str2;
+        }
+        if (str2 == null) {
+            return str1;
+        }
+        int at = indexOfDifference(str1, str2);
+        if (at == -1) {
+            return "";
+        }
+        return str2.substring(at);
+    }
+    public static int indexOfDifference(String str1, String str2) {
+        if (str1 == str2) {
+            return -1;
+        }
+        if (str1 == null || str2 == null) {
+            return 0;
+        }
+        int i;
+        for (i = 0; i < str1.length() && i < str2.length(); ++i) {
+            if (str1.charAt(i) != str2.charAt(i)) {
+                break;
+            }
+        }
+        if (i < str2.length() || i < str1.length()) {
+            return i;
+        }
+        return -1;
+    }
 
     private void applyMinimalModData(StringBuilder builder, CFMod mod) {
         builder.append("- ").append(mod.getName())
